@@ -2,7 +2,13 @@
 
 一个**移动端优先、零依赖、零构建、数据全部保存在本机**的写作自学工作台。
 
-> 当前已启动：**http://localhost:5183/**（服务窗口保持打开即可）
+- 源码仓库：https://github.com/x13502239474-oss/kaoyan-writing
+- 在线访问（GitHub Pages / HTTPS）：https://x13502239474-oss.github.io/kaoyan-writing/
+- 本机访问：**http://localhost:5183/**（服务窗口保持打开即可）
+
+> ⚠️ **线上版与本机版的数据是相互独立的**：所有学习数据存在浏览器 `localStorage`，按「域名 + 端口」隔离。在 `localhost:5183` 写的作文不会自动出现在 GitHub Pages 上，反之亦然。需要迁移时，用「数据管理 → 导出 JSON」，再到另一个地址「恢复 JSON」即可。操作步骤见 `docs/DATA-BACKUP.md`。
+>
+> 在线版是 HTTPS 环境，手机浏览器可正常注册 Service Worker，支持**添加到主屏幕 + 离线使用**；本机局域网 `http://` 访问时功能与保存均正常，但浏览器不允许注册 SW（无离线缓存）。
 
 ---
 
