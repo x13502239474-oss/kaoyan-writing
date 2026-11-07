@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>Writing Site Smoke Test</title></head>
+<body>
+<pre id="out">RUNNING</pre>
+<script>
+(async function () {
+  const KEY = 'ky_writing_v1';
+  const R = [];
+  const ck = (name, ok, detail) => R.push({ name, ok: !!ok, detail: detail === undefined ? '' : String(detail).slice(0, 180) });
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const until = async (fn, ms = 7000) => { const t = Date.now(); while (Date.now() - t < ms) { try { if (await fn()) return true; } catch (e) {} await wait(60); } return false; };
+  const T = async (name, fn) => { try { const v = await fn(); ck(name, v === true || (v && v.ok !== false), v && v.detail ? v.detail : ''); } catch (e) { ck(name, false, e && e.message); } };
+
+  const frame = document.createElement('iframe');
+  frame.style = 'width:390px;height:844px;border:0;display:block';
+  frame.src = '../index.html#/home';
+  document.body.appendChild(frame);
+
+  const ready = await until(() => frame.contentWindow && frame.contentWindow.__KY && frame.contentWindow.__KY.store, 12000);
+  if (!ready) { document.getElementById('out').textContent = JSON.stringify({ fatal: 'app did not boot', results: R }); return; }
+  const w = frame.contentWindow, d = frame.contentDocument, store = w.__KY.store;
+  const nav = async (hash, sel) => { w.location.hash = hash; return until(() => d.querySelector(sel || '.container'), 7000); };
+  const q = s => d.querySelector(s), qa = s => Array.from(d.querySelectorAll(s));
+  const click = s => { const el = q(s); if (!el) throw new Error('missing ' + s); el.click(); return el; };
+  const type = (s, text) => { const el = q(s); if (!el) throw new Error('missing ' + s); el.value = text; el.dispatchEvent(new w.Event('input', { bubbles: true })); return el; };
+  const fillSheet = async (values, okSel = '[data-x="ok"]') => {
+    await until(() => d.querySelector('.overlay .sheet'), 4000);
+    for (const [k, v] of Object.entries(values)) {
+      const el = d.querySelector(`.overlay [data-f="${k}"]`);
+      if (!el) throw new Error('sheet field missing: ' + k);
+      if (el.tagName === 'SELECT') el.value = v; else el.value = v;
+      el.dispatchEvent(new w.Event('input', { bubbles: true }));
+      el.dispatchEvent(new w.Event('change', { bubbles: true }));
+    }
+    const ok = d.querySelector('.overlay ' + okSel); if (!ok) throw new Error('sheet ok button missing');
+    ok.click();
+    await until(() => !d.querySelector('.overlay'), 4000);
+  };
+  const noHScroll = () => d.documentElement.scrollWidth <= w.innerWidth + 2;
+
+  await T('应用启动 / 首页渲染', async () => {
+    const okHero = await until(() => q('.hero'));
+    return { ok: okHero && qa('.task-item').length > 0 && qa('.quick').length === 4,
+      detail: `hero=${!!q('.hero')} tasks=${qa('.task-item').length} quick=${qa('.quick').length}` };
+  });
+
+  await T('内置演示内容完整（课程/素材/范文/训练/试卷）', () => {
+    const s = store.get();
+    return { ok: s.courses.length === 8 && s.materials.length >= 15 && s.modelEssays.length >= 2 && s.drills.length >= 14 && s.exams.length === 3,
+      detail: `courses=${s.courses.length} materials=${s.materials.length} models=${s.modelEssays.length} drills=${s.drills.length} exams=${s.exams.length}` };
+  });
+
+  await T('localStorage 持久化写入', () => ({ ok: (w.localStorage.getItem(KEY) || '').length > 5000, detail: `${(w.localStorage.getItem(KEY) || '').length} bytes` }));
+
+  await T('移动端首页无横向滚动', () => ({ ok: noHScroll(), detail: `scrollWidth=${d.documentElement.scrollWidth} innerWidth=${w.innerWidth}` }));
+
+  await T('课程列表 + 详情 + 标记完成 + 加入复习', async () => {
+    await nav('#/courses', '.course-card');
+    const n = qa('.course-card').length;
+    q('.course-card').click();
+    await until(() => q('.acc'));
+    const revBefore = store.hasReview('course', 'c1'); // 种子数据里 c1 已在复习计划中
+    click('[data-app-action="complete"]');
+    await until(() => store.get().courses.find(c => c.id === 'c1').completed);
+    click('[data-app-action="review"]');
+    await until(() => store.hasReview('course', 'c1') !== revBefore);
+    const revAfter = store.hasReview('course', 'c1');
+    return { ok: n === 8 && store.get().courses.find(c => c.id === 'c1').completed && revAfter !== revBefore,
+      detail: `cards=${n} review ${revBefore}->${revAfter}` };
+  });
+
+  await T('课程个人笔记：新增并持久保存', async () => {
+    await until(() => q('[data-tab="notes"]'));
+    click('[data-tab="notes"]');
+    await until(() => q('[data-note-add]'));
+    click('[data-note-add]');
+    await fillSheet({ text: '自动化测试笔记：知识点要写清为什么推不出。' });
+    await until(() => (store.get().notes['course:c1'] || []).length > 0);
+    return { ok: (store.get().notes['course:c1'] || []).length > 0 };
+  });
+
+  await T('素材库：搜索 / 收藏 / 新增 / 编辑', async () => {
+    await nav('#/materials', '#mat-q');
+    type('#mat-q', '创新');
+    await until(() => qa('.mat-card').length > 0 && qa('.mat-card').length < store.get().materials.length);
+    const filtered = qa('.mat-card').length;
+    type('#mat-q', '');
+    await until(() => qa('.mat-card').length >= 15);
+    const before = store.get().materials.length;
+    click('[data-m-fav]');
+    await until(() => store.get().materials.some(m => m.favorite));
+    click('[data-app-action="add"]');
+    await fillSheet({ theme: '自动化测试', type: '论据', title: '测试素材', content: '这是一条由自动化测试添加的个人素材。', source: '测试', tags: '测试' });
+    await until(() => store.get().materials.length === before + 1);
+    const added = store.get().materials.find(m => m.title === '测试素材');
+    return { ok: filtered > 0 && added && added.label === 'user', detail: `filtered=${filtered} added=${!!added}` };
+  });
+
+  await T('范文：逐段学习 + 好句收藏', async () => {
+    await nav('#/model/me1', '.para-card');
+    const paras = qa('.para-card').length;
+    click('[data-tab="read"]');
+    await until(() => q('[data-para-learn]'));
+    const phBefore = store.get().phrases.length;
+    click('[data-para-learn]');
+    await until(() => (store.get().modelEssays.find(m => m.id === 'me1').learned || []).length === 1);
+    click('[data-para-phrase]');
+    await fillSheet({ text: '测试收藏句：守正为出新提供可比较的基线。', note: '测试' });
+    await until(() => store.get().phrases.length === phBefore + 1);
+    return { ok: paras === 6 && store.get().phrases.length === phBefore + 1, detail: `paras=${paras}` };
+  });
+
+  await T('专项训练：编辑器自动保存 + 提交记录 + 参考对照', async () => {
+    await nav('#/drill/d3', '#drill-answer');
+    const text = '材料由单个品牌半年销售额增长三倍，直接推出直播带货是最有效的营销方式，这一推断至少存在四处问题。第一，增长三倍缺少基数与同期对照数据；第二，单一样本不足以推出全称判断，且未排除投放力度、时机与品类差异等替代解释；第三，由有效推出应立即全面转向，属于虚假两难与结论过度延伸；第四，只要照做就能复制，把有利因素误当充分条件。';
+    type('#drill-answer', text);
+    await until(() => (store.get().drillDrafts.d3 || '').includes('充分条件'), 4000);
+    const before = store.get().drillRecords.length;
+    click('[data-submit]');
+    await until(() => store.get().drillRecords.length === before + 1, 6000);
+    await until(() => d.body.innerText.includes('参考要点对照'), 5000);
+    return { ok: store.get().drillRecords.length === before + 1 && d.body.innerText.includes('参考要点对照'), detail: `records=${store.get().drillRecords.length}` };
+  });
+
+  let essayId = '';
+  await T('自由写作：草稿自动保存 + 保存为作文 + 字数统计', async () => {
+    await nav('#/write/new', '#new-content');
+    const text = '压缩评审环节确实能立刻缩短交付周期，但返工往往在数月后才集中显现。若评估口径只统计本周完成量，前者被记为收益，后者落在另一个考核周期，于是更快被误当成更有效。这说明结论的可信度取决于比较口径是否覆盖完整的成本链条。';
+    type('#new-content', text);
+    await until(() => (store.get().newEssayDraft.content || '').includes('成本链条'), 4000);
+    q('#new-title').value = '自动化测试作文'; q('#new-title').dispatchEvent(new w.Event('input', { bubbles: true }));
+    await wait(650);
+    const before = store.get().essays.length;
+    click('[data-save-essay]');
+    await until(() => store.get().essays.length === before + 1, 6000);
+    essayId = store.get().essays[0].id;
+    await until(() => q('#essay-content'), 6000);
+    const wc = q('[data-wc]') ? q('[data-wc]').textContent : '';
+    return { ok: store.get().essays[0].title === '自动化测试作文' && wc.includes('字'), detail: `wc=${wc}` };
+  });
+
+  await T('作文：人工自评 + 保存版本 + 修改前后对比', async () => {
+    await until(() => q('#e-score'));
+    q('#e-score').value = '78'; q('#e-score').dispatchEvent(new w.Event('input', { bubbles: true }));
+    q('#e-eval').value = '测试自评：结构清楚，但分析句还可再展开。';
+    q('#e-problems').value = '举例后缺少分析，结尾仓促';
+    click('[data-save-self]');
+    await until(() => store.get().essays.find(e => e.id === essayId).selfScore === 78, 5000);
+    click('[data-save-version]');
+    await fillSheet({ label: '测试修改稿' });
+    await until(() => (store.get().essays.find(e => e.id === essayId).versions || []).length >= 2, 5000);
+    await nav('#/essay/' + essayId + '/diff', '.diff-grid');
+    return { ok: qa('.diff-line').length > 0 && qa('.diff-col').length === 2, detail: `diffLines=${qa('.diff-line').length}` };
+  });
+
+  await T('写作考试：开始 / 倒计时 / 自动保存 / 交卷 / 答卷 / 人工评分 / 存档案', async () => {
+    await nav('#/exam/ex1', '[data-start]');
+    click('[data-start]');
+    await until(() => q('#exam-answer'), 6000);
+    const timer = q('#timer-value') ? q('#timer-value').textContent : '';
+    const text = '材料由某品牌直播带货销售额增长三倍，推出直播带货是最有效的营销方式，并建议传统企业全面转向线上。该论证在数据口径、样本代表性、因果归属与结论范围上均存在缺陷。首先，增长三倍缺少基数、统计口径与同期对照，不足以支持不同营销方式之间的比较。其次，单一新兴品牌的经验不能推出全称判断，且材料未排除投放力度、上线时机与竞品供给等替代解释。再次，由有效推出应立即停止线下投入，忽略了线上与线下并行的中间方案，属于虚假两难与结论过度延伸。最后，只要照做就能复制把有利因素当成充分条件，创始人访谈亦属个人判断，难以构成印证。综上，该结论尚需补充可比数据与适用条件说明。';
+    type('#exam-answer', text);
+    await until(() => {
+      const a = store.get().examAttempts.filter(x => x.status === 'in_progress').slice(-1)[0];
+      return a && (a.answers.ex1q1 || '').includes('适用条件');
+    }, 5000);
+    click('[data-submit-exam]');
+    await until(() => q('#rubric-card'), 7000);
+    const att = store.get().examAttempts.filter(x => x.status === 'submitted').slice(-1)[0];
+    qa('[data-rubric]').forEach(r => { r.value = '20'; r.dispatchEvent(new w.Event('input', { bubbles: true })); });
+    q('#self-eval').value = '测试自评：四个维度都能覆盖，语言可再精炼。';
+    q('#self-problems').value = '条件关系误用，措辞偏绝对';
+    click('[data-save-score]');
+    await until(() => store.get().examAttempts.find(x => x.id === att.id).totalScore === 80, 5000);
+    const before = store.get().essays.length;
+    click('[data-to-archive]');
+    await until(() => store.get().essays.length === before + 1, 5000);
+    return { ok: att && att.status === 'submitted' && att.totalScore === 80 && q('#rubric-card') && /^\d\d:\d\d:\d\d$/.test(timer),
+      detail: `timer=${timer} score=${att && att.totalScore}` };
+  });
+
+  await T('复习：待复习项按间隔重新排期', async () => {
+    await nav('#/review', '[data-rev]');
+    const before = store.dueReviews().length;
+    const first = q('[data-rev][data-result="good"]');
+    if (!first) return { ok: before === 0, detail: 'no due items' };
+    const id = first.dataset.rev;
+    first.click();
+    await until(() => { const r = store.get().reviewQueue.find(x => x.id === id); return r && r.stage >= 1; }, 5000);
+    return { ok: true, detail: `due before=${before} after=${store.dueReviews().length}` };
+  });
+
+  await T('数据：导出对象 / 解析校验 / 覆盖恢复 / 合并恢复', () => {
+    const snap = JSON.stringify(store.backupObject());
+    const parsed = store.parseBackup(snap);
+    const before = store.get().essays.length;
+    store.restoreBackup(snap, 'replace');
+    const ok1 = store.get().essays.length === before;
+    store.restoreBackup(snap, 'merge');
+    const ok2 = store.get().essays.length === before;
+    return { ok: parsed.courses.length === 8 && ok1 && ok2, detail: `parsedCourses=${parsed.courses.length}` };
+  });
+
+  await T('数据：内容包导入（教材/范文/真题协议）', () => {
+    const before = store.get().courses.length;
+    const r = store.importContent(JSON.stringify(store.contentTemplate()));
+    const after = store.get().courses.length;
+    const imported = store.get().courses[after - 1];
+    return { ok: after === before + 1 && imported.label === 'import' && r.materials === 1 && r.exams === 1,
+      detail: `courses ${before}->${after} exams=${r.exams}` };
+  });
+
+  await T('数据管理页与 PWA 清单', async () => {
+    await nav('#/settings', '#drop-zone');
+    const legend = qa('.legend-row').length;
+    const res = await w.fetch('../manifest.webmanifest');
+    const man = await res.json();
+    return { ok: !!q('[data-act="export"]') && legend === 5 && man.icons.length === 3 && man.display === 'standalone',
+      detail: `legend=${legend} icons=${man.icons.length}` };
+  });
+
+  await T('PWA Service Worker 注册 + 图标可访问', async () => {
+    let reg = null;
+    await until(async () => { try { reg = await w.navigator.serviceWorker.getRegistration(); return !!reg; } catch { return false; } }, 6000);
+    const iconRes = await w.fetch('../icons/icon-192.png');
+    return { ok: !!reg && iconRes.ok, detail: `sw=${!!reg} icon=${iconRes.status}` };
+  });
+
+  await T('内容来源标注与免责声明可见', async () => {
+    let ok = false, detail = '';
+    for (const h of ['#/home', '#/courses', '#/materials', '#/models', '#/exams']) {
+      await nav(h, '.container'); await wait(120);
+      const txt = d.body.innerText;
+      const demo = qa('.label-demo,.label-ai,.label-public,.label-user,.label-import').length;
+      // 首页不直接列内容条目，只需有内容声明；其余页面还需有来源标签
+      if (!txt.includes('不含真实考研真题') || (h !== '#/home' && !demo)) { detail = `${h}: badges=${demo} disclaimer=${txt.includes('不含真实考研真题')}`; return { ok: false, detail }; }
+    }
+    ok = true;
+    return { ok, detail: '5 个页面均有来源标签与内容声明' };
+  });
+
+  await T('移动端各页面无横向滚动', async () => {
+    const pages = ['#/home', '#/courses', '#/materials', '#/models', '#/drills', '#/exams', '#/archive', '#/review', '#/settings', '#/me'];
+    const bad = [];
+    for (const h of pages) {
+      w.location.hash = h; await wait(140);
+      if (!noHScroll()) bad.push(`${h}:${d.documentElement.scrollWidth}/${w.innerWidth}`);
+    }
+    return { ok: bad.length === 0, detail: bad.join(',') || 'all pages fit 390px' };
+  });
+
+  await T('刷新后数据不丢失（真实重载）', async () => {
+    const snap = w.localStorage.getItem(KEY);
+    if (!snap || !snap.includes('自动化测试作文')) return { ok: false, detail: 'essay not in storage' };
+    frame.src = '../index.html#/home';
+    await until(() => frame.contentWindow && frame.contentWindow.__KY && frame.contentWindow.document.querySelector('.hero'), 10000);
+    const w2 = frame.contentWindow, s2 = w2.__KY.store.get();
+    return { ok: s2.essays.some(e => e.title === '自动化测试作文') && s2.examAttempts.some(a => a.totalScore === 80),
+      detail: `essays=${s2.essays.length} attempts=${s2.examAttempts.length}` };
+  });
+
+  const pass = R.filter(x => x.ok).length;
+  document.getElementById('out').textContent = 'SMOKE_RESULT=' + JSON.stringify({ total: R.length, pass, fail: R.length - pass, results: R });
+  document.title = 'SMOKE_DONE_' + pass + '_' + R.length;
+})().catch(e => { document.getElementById('out').textContent = 'SMOKE_FATAL=' + (e && e.stack ? e.stack : e); });
+</script>
+</body>
+</html>

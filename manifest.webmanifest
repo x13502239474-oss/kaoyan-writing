@@ -1,0 +1,24 @@
+{
+  "id": "./",
+  "name": "考研写作 · 自学工作台",
+  "short_name": "写作",
+  "description": "管理类/经济类联考写作个人自学：课程、素材库、范文拆解、专项训练、限时写作、作文档案与复习统计。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#F5F7FB",
+  "theme_color": "#3B5BDB",
+  "categories": ["education", "productivity"],
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "开始写作", "short_name": "写作", "url": "./#/write/new", "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "今日复习", "short_name": "复习", "url": "./#/review", "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

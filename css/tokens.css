@@ -1,0 +1,116 @@
+/* ============================================================
+   考研系列自学站 · 统一设计令牌 (Kaoyan Design System v1)
+   ------------------------------------------------------------
+   四个子站（数学 / 写作 / 逻辑 / 英语二）共用本文件的变量命名与数值，
+   以保证视觉与交互一致。各站可覆写 --brand-* 作为学科色。
+   主题：浅色（Light），移动端优先。
+   ============================================================ */
+:root {
+  /* 学科品牌色：写作站 = 靛蓝 + 印章红点缀 */
+  --brand: #3B5BDB;
+  --brand-strong: #2D47B8;
+  --brand-soft: #EEF2FF;
+  --brand-soft-2: #E3EAFF;
+  --brand-on: #FFFFFF;
+  --seal: #B4433A;
+  --seal-soft: #FBEEEC;
+
+  /* 中性色 */
+  --bg: #F5F7FB;
+  --surface: #FFFFFF;
+  --surface-2: #F8FAFD;
+  --surface-3: #F1F4FA;
+  --border: #E5EAF2;
+  --border-strong: #D3DBE9;
+  --ink: #1B2434;
+  --ink-2: #44506A;
+  --muted: #7A8699;
+  --faint: #A5AEBC;
+
+  /* 语义色 */
+  --success: #0E8359;
+  --success-soft: #E7F6EF;
+  --warn: #B8730C;
+  --warn-soft: #FFF3E0;
+  --danger: #C0392B;
+  --danger-soft: #FDECEA;
+  --info: #1C6FB5;
+  --info-soft: #E8F3FC;
+
+  /* 内容标签色 */
+  --label-demo: #6B5B95;
+  --label-demo-bg: #F0EDF9;
+  --label-ai: #0F766E;
+  --label-ai-bg: #E4F5F2;
+  --label-user: #1C6FB5;
+  --label-user-bg: #E8F3FC;
+  --label-import: #8A5A12;
+  --label-import-bg: #FBF1DE;
+  --label-public: #4B6178;
+  --label-public-bg: #EAF0F6;
+
+  /* 圆角 / 阴影 / 间距 */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+  --r-pill: 999px;
+  --sh-1: 0 1px 2px rgba(27, 36, 52, .04), 0 2px 8px rgba(27, 36, 52, .04);
+  --sh-2: 0 4px 16px rgba(27, 36, 52, .08);
+  --sh-3: 0 12px 40px rgba(27, 36, 52, .16);
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
+
+  /* 字号 */
+  --fs-xs: 11px; --fs-sm: 12px; --fs-base: 14px; --fs-md: 15px;
+  --fs-lg: 17px; --fs-xl: 20px; --fs-2xl: 24px; --fs-3xl: 28px;
+
+  /* 字体 */
+  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
+               "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif;
+  --font-read: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", "STSong", Georgia, serif;
+
+  /* 布局 */
+  --appbar-h: 56px;
+  --tabbar-h: 62px;
+  --sidebar-w: 236px;
+  --content-max: 940px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+/* ---------- Reset ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html, body { margin: 0; padding: 0; width: 100%; max-width: 100%; overflow-x: hidden; }
+body {
+  font-family: var(--font-sans);
+  font-size: var(--fs-base);
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+h1, h2, h3, h4, h5, p, ul, ol, figure, blockquote { margin: 0; }
+ul, ol { padding-left: 1.2em; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; background: none; }
+a { color: var(--brand); text-decoration: none; }
+img, svg { max-width: 100%; vertical-align: middle; }
+hr { border: 0; border-top: 1px solid var(--border); margin: var(--sp-4) 0; }
+:focus-visible { outline: 3px solid rgba(59, 91, 219, .38); outline-offset: 2px; }
+::selection { background: var(--brand-soft-2); }
+
+/* 禁止 iOS 输入框自动放大：所有可编辑控件 >= 16px */
+input, textarea, select, [contenteditable="true"] { font-size: 16px; }
+
+/* 滚动条（桌面） */
+@media (min-width: 1024px) {
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: #CDD5E3; border-radius: 9px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+}

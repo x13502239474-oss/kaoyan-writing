@@ -1,0 +1,32 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Layout Check</title></head><body>
+<pre id="out">RUNNING</pre>
+<script>
+(async () => {
+  const out = [];
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const until = async (fn, ms = 8000) => { const t = Date.now(); while (Date.now() - t < ms) { try { if (fn()) return true; } catch (e) {} await wait(60); } return false; };
+  for (const W of [320, 360, 390, 430, 768, 1024, 1440]) {
+    const f = document.createElement('iframe');
+    f.style = `width:${W}px;height:800px;border:0;display:block`;
+    f.src = '../index.html#/home';
+    document.body.appendChild(f);
+    await until(() => f.contentWindow && f.contentWindow.__KY, 9000);
+    const w = f.contentWindow, d = f.contentDocument;
+    for (const hash of ['#/home', '#/courses', '#/materials', '#/drill/d3', '#/exam/ex1', '#/settings']) {
+      w.location.hash = hash; await wait(160);
+      const de = d.documentElement;
+      const over = [];
+      d.querySelectorAll('body *').forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && (r.right > w.innerWidth + 1 || r.left < -1)) over.push(el.className && typeof el.className === 'string' ? el.className.split(' ')[0] : el.tagName);
+      });
+      out.push({ W, hash, inner: w.innerWidth, client: de.clientWidth, scroll: de.scrollWidth,
+        tabCount: d.querySelectorAll('.tabbar .tab').length,
+        quick: d.querySelectorAll('.quick').length,
+        overflow: [...new Set(over)].slice(0, 6) });
+    }
+    f.remove();
+  }
+  document.getElementById('out').textContent = 'LAYOUT_RESULT=' + JSON.stringify(out);
+})().catch(e => { document.getElementById('out').textContent = 'LAYOUT_FATAL=' + e.stack; });
+</script></body></html>
